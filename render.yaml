@@ -2,13 +2,10 @@ services:
   - type: web
     name: weather-rain-api
     env: python
-
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn rain_prediction_ml:app
-
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-
       - key: WEATHER_API_KEY
         sync: false
