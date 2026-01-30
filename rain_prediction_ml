@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 import requests
 import numpy as np
+import os
 from datetime import datetime
 
 app = Flask(__name__)
 
-WEATHER_API_KEY = "3d154edbd0ca48a9acc184518262901"
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 class RainPredictionModel:
     """
@@ -855,3 +856,4 @@ if __name__ == "__main__":
     print("")
 
     app.run(debug=True, host="127.0.0.1", port=5000)
+
