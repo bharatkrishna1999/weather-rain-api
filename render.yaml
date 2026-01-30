@@ -1,9 +1,9 @@
-services:
+yamlservices:
   - type: web
     name: weather-rain-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn rain_prediction_ml:app
+    startCommand: gunicorn --bind 0.0.0.0:$PORT rain_prediction_ml:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
