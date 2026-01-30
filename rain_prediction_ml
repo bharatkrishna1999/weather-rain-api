@@ -853,4 +853,5 @@ if __name__ == "__main__":
     print("📊 JSON Endpoint: http://127.0.0.1:5000/predict-rain?city=Chennai")
     print("ℹ️  Model Info: http://127.0.0.1:5000/model-info")
     print("")
+
     app.run(debug=True, host="127.0.0.1", port=5000)
