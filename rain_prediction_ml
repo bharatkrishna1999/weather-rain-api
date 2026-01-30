@@ -4,7 +4,7 @@ import numpy as np
 import os
 from datetime import datetime
 
-app = Flask(__name__)
+rain_prediction_ml = Flask(__name__)
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
@@ -856,4 +856,5 @@ if __name__ == "__main__":
     print("")
 
     app.run(debug=True, host="127.0.0.1", port=5000)
+
 
