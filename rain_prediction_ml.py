@@ -107,31 +107,53 @@ class AQICigaretteConverter:
         return round(pm25 / 22, 1)
     
     @staticmethod
-    def aqi_to_pm25(aqi):
+    def pm25_to_aqi(pm25):
         """
-        Convert AQI to PM2.5 concentration
-        Uses EPA formula
+        Convert PM2.5 to AQI (0-500 scale) using EPA breakpoints
         """
-        if aqi is None:
-            return None
+        if pm25 is None or pm25 < 0:
+            return 0
         
-        # AQI breakpoints for PM2.5
+        # EPA AQI breakpoints for PM2.5 (24-hour)
         breakpoints = [
-            (0, 50, 0.0, 12.0),
-            (51, 100, 12.1, 35.4),
-            (101, 150, 35.5, 55.4),
-            (151, 200, 55.5, 150.4),
-            (201, 300, 150.5, 250.4),
-            (301, 500, 250.5, 500.4)
+            (0.0, 12.0, 0, 50),      # Good
+            (12.1, 35.4, 51, 100),   # Moderate
+            (35.5, 55.4, 101, 150),  # Unhealthy for Sensitive Groups
+            (55.5, 150.4, 151, 200), # Unhealthy
+            (150.5, 250.4, 201, 300),# Very Unhealthy
+            (250.5, 500.4, 301, 500) # Hazardous
         ]
         
-        for aqi_low, aqi_high, pm_low, pm_high in breakpoints:
-            if aqi_low <= aqi <= aqi_high:
-                # Linear interpolation
-                pm25 = ((aqi - aqi_low) / (aqi_high - aqi_low)) * (pm_high - pm_low) + pm_low
-                return round(pm25, 1)
+        for pm_low, pm_high, aqi_low, aqi_high in breakpoints:
+            if pm_low <= pm25 <= pm_high:
+                # Linear interpolation formula
+                aqi = ((aqi_high - aqi_low) / (pm_high - pm_low)) * (pm25 - pm_low) + aqi_low
+                return round(aqi)
         
-        return None
+        # If PM2.5 is above 500.4, return 500 (max)
+        return 500
+    
+    @staticmethod
+    def aqi_to_category(aqi):
+        """
+        Get AQI category and color based on 0-500 scale
+        """
+        if aqi <= 50:
+            return {"level": "Good", "color": "#00e400", "advice": "Air quality is satisfactory"}
+        elif aqi <= 100:
+            return {"level": "Moderate", "color": "#ffff00", "advice": "Acceptable for most people"}
+        elif aqi <= 150:
+            return {"level": "Unhealthy for Sensitive Groups", "color": "#ff7e00", 
+                    "advice": "Sensitive groups should limit outdoor exposure"}
+        elif aqi <= 200:
+            return {"level": "Unhealthy", "color": "#ff0000", 
+                    "advice": "Everyone should limit prolonged outdoor exposure"}
+        elif aqi <= 300:
+            return {"level": "Very Unhealthy", "color": "#8f3f97", 
+                    "advice": "Everyone should avoid outdoor activities"}
+        else:
+            return {"level": "Hazardous", "color": "#7e0023", 
+                    "advice": "Everyone should remain indoors"}
     
     @staticmethod
     def get_health_comparison(pm25):
@@ -252,24 +274,16 @@ def weather_aqi():
         current = data['current']
         aqi_data = current.get('air_quality', {})
         
-        # Get PM2.5 and calculate cigarette equivalent
+        # Get PM2.5 and calculate AQI
         pm25 = aqi_data.get('pm2_5', 0)
-        us_epa_index = aqi_data.get('us-epa-index', 0)
+        us_epa_index = aqi_data.get('us-epa-index', 0)  # 1-6 scale
+        
+        # Calculate actual AQI (0-500 scale)
+        calculated_aqi = aqi_converter.pm25_to_aqi(pm25)
+        aqi_info = aqi_converter.aqi_to_category(calculated_aqi)
         
         cigarettes_per_day = aqi_converter.pm25_to_cigarettes(pm25)
         health_comparisons = aqi_converter.get_health_comparison(pm25)
-        
-        # AQI health categories
-        aqi_categories = {
-            1: {"level": "Good", "color": "green", "advice": "Air quality is satisfactory"},
-            2: {"level": "Moderate", "color": "yellow", "advice": "Acceptable for most people"},
-            3: {"level": "Unhealthy for Sensitive Groups", "color": "orange", "advice": "Sensitive groups should limit outdoor exposure"},
-            4: {"level": "Unhealthy", "color": "red", "advice": "Everyone should limit prolonged outdoor exposure"},
-            5: {"level": "Very Unhealthy", "color": "purple", "advice": "Everyone should avoid outdoor activities"},
-            6: {"level": "Hazardous", "color": "maroon", "advice": "Everyone should remain indoors"}
-        }
-        
-        aqi_info = aqi_categories.get(us_epa_index, {"level": "Unknown", "color": "gray", "advice": "Data unavailable"})
         
         return jsonify({
             "location": f"{location['name']}, {location['region']}, {location['country']}",
@@ -279,10 +293,11 @@ def weather_aqi():
                 "humidity": f"{current['humidity']}%"
             },
             "air_quality": {
-                "pm2_5": f"{pm25} μg/m³",
-                "aqi_index": us_epa_index,
+                "aqi": calculated_aqi,
                 "aqi_level": aqi_info['level'],
                 "health_advice": aqi_info['advice'],
+                "pm2_5": f"{pm25} μg/m³",
+                "us_epa_index": us_epa_index,
                 "cigarette_equivalent": {
                     "per_day": cigarettes_per_day,
                     "per_week": round(cigarettes_per_day * 7, 1),
@@ -328,20 +343,19 @@ def rain_forecast_html():
         current = data['current']
         forecast_days = data['forecast']['forecastday']
         
-        # Get AQI data - FIX: Get from current air_quality correctly
+        # Get AQI data - FIX: Calculate proper AQI from PM2.5
         aqi_data = current.get('air_quality', {})
         pm25 = aqi_data.get('pm2_5', 0)
-        us_epa_index = aqi_data.get('us-epa-index', 0)
+        us_epa_index = aqi_data.get('us-epa-index', 0)  # 1-6 scale (internal)
         
-        print(f"DEBUG - PM2.5: {pm25}, US EPA Index: {us_epa_index}")  # Debug
+        # Calculate actual AQI (0-500 scale that people understand)
+        calculated_aqi = aqi_converter.pm25_to_aqi(pm25)
+        aqi_info = aqi_converter.aqi_to_category(calculated_aqi)
+        
+        print(f"DEBUG - PM2.5: {pm25}, Calculated AQI: {calculated_aqi}, EPA Index: {us_epa_index}")
         
         cigarettes_per_day = aqi_converter.pm25_to_cigarettes(pm25)
         yearly_cigs = round(cigarettes_per_day * 365, 0)
-        
-        aqi_levels = {1: "Good", 2: "Moderate", 3: "Unhealthy for Sensitive Groups",
-                      4: "Unhealthy", 5: "Very Unhealthy", 6: "Hazardous"}
-        aqi_colors = {1: "#00e400", 2: "#ffff00", 3: "#ff7e00",
-                      4: "#ff0000", 5: "#8f3f97", 6: "#7e0023"}
         
         # Run rain predictions
         predictions = []
@@ -439,7 +453,7 @@ def rain_forecast_html():
                     font-size: 5em; font-weight: bold; color: #e74c3c; text-align: center; margin: 20px 0;
                 }}
                 .aqi-badge {{
-                    display: inline-block; background: {aqi_colors.get(us_epa_index, "#cccccc")};
+                    display: inline-block; background: {aqi_info['color']};
                     color: white; padding: 15px 30px; border-radius: 30px;
                     font-weight: bold; font-size: 1.3em; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
                 }}
@@ -658,7 +672,10 @@ def rain_forecast_html():
                     <div class="aqi-card">
                         <h2 class="aqi-title">🏭 Air Quality Index</h2>
                         <div style="text-align: center; margin-bottom: 30px;">
-                            <span class="aqi-badge">AQI """ + str(us_epa_index) + """ - """ + aqi_levels.get(us_epa_index, "Unknown") + """</span>
+                            <span class="aqi-badge">AQI """ + str(calculated_aqi) + """ - """ + aqi_info['level'] + """</span>
+                            <div style="margin-top: 15px; font-size: 1.1em; color: #555;">
+                                <strong>""" + aqi_info['advice'] + """</strong>
+                            </div>
                         </div>
                         
                         <div class="cigarette-equiv">
@@ -680,6 +697,21 @@ def rain_forecast_html():
                                 <p style="margin-top: 10px; font-size: 0.9em; color: #888;">
                                     Source: <a href="https://berkeleyearth.org/air-pollution-and-cigarette-equivalence/" target="_blank">Berkeley Earth</a>
                                 </p>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 30px;">
+                            <h3 style="margin-bottom: 15px;">Understanding AQI</h3>
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px;">
+                                <p style="margin-bottom: 10px;"><strong>AQI Scale (0-500):</strong></p>
+                                <ul style="list-style: none; padding-left: 0;">
+                                    <li style="padding: 5px 0;">🟢 <strong>0-50:</strong> Good</li>
+                                    <li style="padding: 5px 0;">🟡 <strong>51-100:</strong> Moderate</li>
+                                    <li style="padding: 5px 0;">🟠 <strong>101-150:</strong> Unhealthy for Sensitive Groups</li>
+                                    <li style="padding: 5px 0;">🔴 <strong>151-200:</strong> Unhealthy</li>
+                                    <li style="padding: 5px 0;">🟣 <strong>201-300:</strong> Very Unhealthy</li>
+                                    <li style="padding: 5px 0;">🟤 <strong>301-500:</strong> Hazardous</li>
+                                </ul>
                             </div>
                         </div>
                         
