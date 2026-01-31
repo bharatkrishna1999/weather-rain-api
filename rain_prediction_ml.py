@@ -328,10 +328,12 @@ def rain_forecast_html():
         current = data['current']
         forecast_days = data['forecast']['forecastday']
         
-        # Get AQI data
+        # Get AQI data - FIX: Get from current air_quality correctly
         aqi_data = current.get('air_quality', {})
         pm25 = aqi_data.get('pm2_5', 0)
         us_epa_index = aqi_data.get('us-epa-index', 0)
+        
+        print(f"DEBUG - PM2.5: {pm25}, US EPA Index: {us_epa_index}")  # Debug
         
         cigarettes_per_day = aqi_converter.pm25_to_cigarettes(pm25)
         yearly_cigs = round(cigarettes_per_day * 365, 0)
@@ -376,6 +378,7 @@ def rain_forecast_html():
                 "will_rain": will_rain,
                 "rain_prob": rain_prob,
                 "confidence": confidence,
+                "conf_percent": conf_percent,
                 "max_temp": day['day']['maxtemp_c'],
                 "min_temp": day['day']['mintemp_c'],
                 "condition": day['day']['condition']['text'],
@@ -385,12 +388,12 @@ def rain_forecast_html():
                 "icon": day['day']['condition']['icon']
             })
         
-        # HTML with AQI section
+        # HTML with tabs for Rain Forecast and AQI
         html = f"""
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Weather & AQI - {location['name']}</title>
+            <title>Weather Forecast - {location['name']}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -402,29 +405,60 @@ def rain_forecast_html():
                 .container {{ max-width: 1200px; margin: 0 auto; }}
                 .header {{ text-align: center; color: white; margin-bottom: 30px; }}
                 .header h1 {{ font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }}
+                .location {{ font-size: 1.3em; opacity: 0.9; }}
                 
+                /* Tabs */
+                .tabs {{
+                    display: flex; gap: 10px; justify-content: center; margin-bottom: 30px;
+                }}
+                .tab {{
+                    background: rgba(255,255,255,0.2); color: white; padding: 15px 30px;
+                    border-radius: 10px; cursor: pointer; font-size: 1.1em; font-weight: bold;
+                    border: 2px solid transparent; transition: all 0.3s;
+                }}
+                .tab:hover {{ background: rgba(255,255,255,0.3); }}
+                .tab.active {{
+                    background: white; color: #667eea; border-color: white;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                }}
+                
+                .tab-content {{ display: none; }}
+                .tab-content.active {{ display: block; }}
+                
+                /* AQI Card */
                 .aqi-card {{
                     background: white; border-radius: 20px; padding: 30px;
-                    margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 20px;
                 }}
-                .aqi-title {{ font-size: 1.8em; color: #2c3e50; margin-bottom: 20px; }}
+                .aqi-title {{ font-size: 1.8em; color: #2c3e50; margin-bottom: 20px; text-align: center; }}
                 .cigarette-equiv {{
-                    background: #fff3cd; padding: 20px; border-radius: 15px;
+                    background: #fff3cd; padding: 25px; border-radius: 15px;
                     border-left: 5px solid #ff6b6b; margin: 20px 0;
                 }}
                 .big-number {{
-                    font-size: 4em; font-weight: bold; color: #e74c3c; text-align: center; margin: 20px 0;
+                    font-size: 5em; font-weight: bold; color: #e74c3c; text-align: center; margin: 20px 0;
                 }}
                 .aqi-badge {{
                     display: inline-block; background: {aqi_colors.get(us_epa_index, "#cccccc")};
-                    color: white; padding: 10px 20px; border-radius: 25px;
-                    font-weight: bold; font-size: 1.2em;
+                    color: white; padding: 15px 30px; border-radius: 30px;
+                    font-weight: bold; font-size: 1.3em; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
                 }}
+                .pollutants-grid {{
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                    gap: 15px; margin-top: 20px;
+                }}
+                .pollutant-item {{
+                    background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center;
+                }}
+                .pollutant-label {{ font-size: 0.9em; color: #7f8c8d; margin-bottom: 5px; }}
+                .pollutant-value {{ font-size: 1.3em; font-weight: bold; color: #2c3e50; }}
                 
+                /* Rain Forecast */
                 .summary-card {{
                     background: white; border-radius: 20px; padding: 30px;
                     margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
                 }}
+                .summary-header {{ text-align: center; margin-bottom: 20px; }}
                 .rain-status {{
                     display: inline-block; padding: 15px 40px; border-radius: 50px;
                     font-size: 1.8em; font-weight: bold; margin: 10px 0;
@@ -432,7 +466,65 @@ def rain_forecast_html():
                 .rain-yes {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }}
                 .rain-no {{ background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%); color: white; }}
                 .probability {{ font-size: 3em; font-weight: bold; color: #2c3e50; margin: 15px 0; }}
+                .recommendation {{
+                    background: #f8f9fa; padding: 20px; border-radius: 15px;
+                    border-left: 5px solid #667eea; margin-top: 20px;
+                }}
+                .recommendation-icon {{ font-size: 2em; margin-right: 10px; }}
                 
+                /* Day Cards */
+                .days-grid {{
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 20px; margin-top: 30px;
+                }}
+                .day-card {{
+                    background: white; border-radius: 15px; padding: 25px;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                    transition: transform 0.3s ease;
+                }}
+                .day-card:hover {{
+                    transform: translateY(-5px);
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                }}
+                .day-header {{
+                    display: flex; justify-content: space-between; align-items: center;
+                    margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f0f0f0;
+                }}
+                .day-name {{ font-size: 1.5em; font-weight: bold; color: #2c3e50; }}
+                .weather-icon {{ width: 64px; height: 64px; }}
+                .prediction-badge {{
+                    display: inline-block; padding: 10px 20px; border-radius: 25px;
+                    font-weight: bold; font-size: 1.1em; margin: 10px 0;
+                }}
+                .will-rain {{ background: #3498db; color: white; }}
+                .no-rain {{ background: #2ecc71; color: white; }}
+                .confidence-bar {{
+                    background: #ecf0f1; height: 30px; border-radius: 15px;
+                    overflow: hidden; margin: 15px 0;
+                }}
+                .confidence-fill {{
+                    height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    display: flex; align-items: center; justify-content: center;
+                    color: white; font-weight: bold; transition: width 0.5s ease;
+                }}
+                .weather-details {{
+                    display: grid; grid-template-columns: repeat(2, 1fr);
+                    gap: 15px; margin-top: 20px;
+                }}
+                .detail-item {{
+                    background: #f8f9fa; padding: 12px; border-radius: 10px; text-align: center;
+                }}
+                .detail-label {{ font-size: 0.85em; color: #7f8c8d; margin-bottom: 5px; }}
+                .detail-value {{ font-size: 1.2em; font-weight: bold; color: #2c3e50; }}
+                .confidence-badge {{
+                    display: inline-block; padding: 5px 15px; border-radius: 20px;
+                    font-size: 0.9em; font-weight: bold; margin-left: 10px;
+                }}
+                .confidence-high {{ background: #2ecc71; color: white; }}
+                .confidence-medium {{ background: #f39c12; color: white; }}
+                .confidence-low {{ background: #e74c3c; color: white; }}
+                
+                /* Search Box */
                 .search-box {{ text-align: center; margin-bottom: 30px; }}
                 .search-input {{
                     padding: 15px 25px; font-size: 1.1em; border: none;
@@ -442,15 +534,26 @@ def rain_forecast_html():
                     padding: 15px 35px; font-size: 1.1em; background: white;
                     color: #667eea; border: none; border-radius: 50px;
                     cursor: pointer; margin-left: 10px; font-weight: bold;
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.2); transition: all 0.3s ease;
+                }}
+                .search-button:hover {{
+                    background: #667eea; color: white; transform: translateY(-2px);
+                    box-shadow: 0 7px 20px rgba(0,0,0,0.3);
+                }}
+                
+                @media (max-width: 768px) {{
+                    .header h1 {{ font-size: 1.8em; }}
+                    .tabs {{ flex-direction: column; }}
+                    .days-grid {{ grid-template-columns: 1fr; }}
+                    .search-input {{ width: 200px; font-size: 1em; }}
                 }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🌦️ Weather & Air Quality</h1>
-                    <div style="font-size: 1.3em; opacity: 0.9;">📍 {location['name']}, {location['country']}</div>
+                    <h1>🌦️ Weather Forecast</h1>
+                    <div class="location">📍 {location['name']}, {location['region']}, {location['country']}</div>
                 </div>
                 
                 <div class="search-box">
@@ -460,47 +563,179 @@ def rain_forecast_html():
                     </form>
                 </div>
                 
-                <div class="aqi-card">
-                    <h2 class="aqi-title">🏭 Air Quality Index (AQI)</h2>
-                    <div style="text-align: center;">
-                        <span class="aqi-badge">AQI: {us_epa_index} - {aqi_levels.get(us_epa_index, "Unknown")}</span>
-                        <div style="margin: 20px 0; font-size: 1.1em; color: #555;">
-                            PM2.5: <strong>{pm25} μg/m³</strong>
+                <!-- Tabs -->
+                <div class="tabs">
+                    <div class="tab active" onclick="showTab('rain')">☔ Rain Forecast</div>
+                    <div class="tab" onclick="showTab('aqi')">🏭 Air Quality (AQI)</div>
+                </div>
+                
+                <!-- Rain Forecast Tab -->
+                <div id="rain-tab" class="tab-content active">
+                    <div class="summary-card">
+                        <div class="summary-header">
+                            <div class="rain-status {'rain-yes' if overall_will_rain else 'rain-no'}">
+                                {'☔ YES, It Will Rain!' if overall_will_rain else '☀️ NO Rain Expected'}
+                            </div>
+                            <div class="probability">{round(max_rain_prob)}% Rain Probability</div>
+                        </div>
+                        
+                        <div class="recommendation">
+                            <span class="recommendation-icon">💡</span>
+                            <strong>Recommendation:</strong> 
+                            {
+                                "Pack an umbrella! High chance of rain - plan indoor activities or bring rain gear." if max_rain_prob >= 70 
+                                else "Keep an umbrella handy. Moderate chance of rain - check forecast before outdoor plans." if max_rain_prob >= 50
+                                else "You're good to go! Low chance of rain - enjoy outdoor activities!"
+                            }
                         </div>
                     </div>
                     
-                    <div class="cigarette-equiv">
-                        <h3 style="margin-bottom: 15px;">🚬 Cigarette Equivalent</h3>
-                        <p style="font-size: 1.1em; margin-bottom: 10px;">
-                            Breathing this air is like smoking:
-                        </p>
-                        <div class="big-number">{cigarettes_per_day}</div>
-                        <div style="text-align: center; font-size: 1.3em; margin-top: -10px;">
-                            cigarettes per day
+                    <div class="days-grid">
+        """
+        
+        # Add cards for each day
+        for pred in predictions:
+            rain_emoji = "🌧️" if pred['will_rain'] else "☀️"
+            card_accent = "#3498db" if pred['will_rain'] else "#2ecc71"
+            
+            html += f"""
+                        <div class="day-card">
+                            <div class="day-header">
+                                <div>
+                                    <div class="day-name">{pred['day_name']}</div>
+                                    <div style="color: #7f8c8d; font-size: 0.9em;">{pred['date']}</div>
+                                </div>
+                                <img src="https:{pred['icon']}" alt="{pred['condition']}" class="weather-icon">
+                            </div>
+                            
+                            <div style="text-align: center; margin: 20px 0;">
+                                <div class="prediction-badge {'will-rain' if pred['will_rain'] else 'no-rain'}">
+                                    {rain_emoji} {'RAIN EXPECTED' if pred['will_rain'] else 'NO RAIN'}
+                                </div>
+                                <div style="font-size: 2em; font-weight: bold; color: {card_accent}; margin: 10px 0;">
+                                    {round(pred['rain_prob'])}%
+                                </div>
+                                <div style="color: #7f8c8d;">
+                                    Confidence: <span class="confidence-badge confidence-{pred['confidence'].lower()}">{pred['confidence']}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: {pred['rain_prob']}%;">
+                                    {round(pred['rain_prob'])}% Probability
+                                </div>
+                            </div>
+                            
+                            <div class="weather-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">🌡️ Temperature</div>
+                                    <div class="detail-value">{pred['max_temp']}°C / {pred['min_temp']}°C</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">💧 Humidity</div>
+                                    <div class="detail-value">{pred['humidity']}%</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">🌧️ Precipitation</div>
+                                    <div class="detail-value">{pred['precipitation']} mm</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">☁️ Condition</div>
+                                    <div class="detail-value" style="font-size: 0.9em;">{pred['condition']}</div>
+                                </div>
+                            </div>
+                            
+                            {'<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 10px; text-align: center; color: #856404;"><strong>⚠️ ' + pred["intensity"] + ' Rain Expected</strong></div>' if pred['will_rain'] else ''}
                         </div>
-                        <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #ddd;">
-                            <p>📅 <strong>{int(yearly_cigs)} cigarettes per year</strong></p>
-                            <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                                Source: Berkeley Earth research<br>
-                                (22 μg/m³ PM2.5 = 1 cigarette/day)
-                            </p>
-                        </div>
+            """
+        
+        html += """
                     </div>
                 </div>
                 
-                <div class="summary-card">
-                    <div style="text-align: center;">
-                        <div class="rain-status {'rain-yes' if overall_will_rain else 'rain-no'}">
-                            {'☔ Rain Expected' if overall_will_rain else '☀️ No Rain'}
+                <!-- AQI Tab -->
+                <div id="aqi-tab" class="tab-content">
+                    <div class="aqi-card">
+                        <h2 class="aqi-title">🏭 Air Quality Index</h2>
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <span class="aqi-badge">AQI """ + str(us_epa_index) + """ - """ + aqi_levels.get(us_epa_index, "Unknown") + """</span>
                         </div>
-                        <div class="probability">{round(max_rain_prob)}% Chance</div>
+                        
+                        <div class="cigarette-equiv">
+                            <h3 style="margin-bottom: 15px; text-align: center;">🚬 Cigarette Equivalent</h3>
+                            <p style="font-size: 1.2em; margin-bottom: 10px; text-align: center;">
+                                Breathing this air is like smoking:
+                            </p>
+                            <div class="big-number">""" + str(cigarettes_per_day) + """</div>
+                            <div style="text-align: center; font-size: 1.5em; margin-top: -10px; font-weight: bold;">
+                                cigarette""" + ("s" if cigarettes_per_day != 1 else "") + """ per day
+                            </div>
+                            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd; text-align: center;">
+                                <p style="font-size: 1.2em;"><strong>📅 """ + str(int(yearly_cigs)) + """ cigarettes per year</strong></p>
+                                <p style="margin-top: 15px; font-size: 0.95em; color: #666;">
+                                    <strong>Scientific Basis:</strong><br>
+                                    Berkeley Earth research shows that 22 μg/m³ PM2.5<br>
+                                    for 24 hours = 1 cigarette per day
+                                </p>
+                                <p style="margin-top: 10px; font-size: 0.9em; color: #888;">
+                                    Source: <a href="https://berkeleyearth.org/air-pollution-and-cigarette-equivalence/" target="_blank">Berkeley Earth</a>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 30px;">
+                            <h3 style="margin-bottom: 15px;">Pollutant Levels</h3>
+                            <div class="pollutants-grid">
+                                <div class="pollutant-item">
+                                    <div class="pollutant-label">PM2.5</div>
+                                    <div class="pollutant-value">""" + f"{pm25:.1f}" + """ μg/m³</div>
+                                </div>
+                                <div class="pollutant-item">
+                                    <div class="pollutant-label">PM10</div>
+                                    <div class="pollutant-value">""" + f"{aqi_data.get('pm10', 0):.1f}" + """ μg/m³</div>
+                                </div>
+                                <div class="pollutant-item">
+                                    <div class="pollutant-label">CO</div>
+                                    <div class="pollutant-value">""" + f"{aqi_data.get('co', 0):.1f}" + """ μg/m³</div>
+                                </div>
+                                <div class="pollutant-item">
+                                    <div class="pollutant-label">NO₂</div>
+                                    <div class="pollutant-value">""" + f"{aqi_data.get('no2', 0):.1f}" + """ μg/m³</div>
+                                </div>
+                                <div class="pollutant-item">
+                                    <div class="pollutant-label">O₃</div>
+                                    <div class="pollutant-value">""" + f"{aqi_data.get('o3', 0):.1f}" + """ μg/m³</div>
+                                </div>
+                                <div class="pollutant-item">
+                                    <div class="pollutant-label">SO₂</div>
+                                    <div class="pollutant-value">""" + f"{aqi_data.get('so2', 0):.1f}" + """ μg/m³</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
                 <div style="text-align: center; margin-top: 40px; color: white; opacity: 0.8;">
-                    <p>🤖 ML Weather Model + Berkeley Earth AQI Research</p>
+                    <p>🤖 Powered by Machine Learning Weather Model + Berkeley Earth AQI Research</p>
+                    <p style="font-size: 0.9em; margin-top: 10px;">Using meteorological parameters: Humidity, Pressure, Cloud Cover, Precipitation</p>
                 </div>
             </div>
+            
+            <script>
+                function showTab(tabName) {
+                    // Hide all tabs
+                    document.querySelectorAll('.tab-content').forEach(tab => {
+                        tab.classList.remove('active');
+                    });
+                    document.querySelectorAll('.tab').forEach(tab => {
+                        tab.classList.remove('active');
+                    });
+                    
+                    // Show selected tab
+                    document.getElementById(tabName + '-tab').classList.add('active');
+                    event.target.classList.add('active');
+                }
+            </script>
         </body>
         </html>
         """
@@ -508,7 +743,7 @@ def rain_forecast_html():
         return html
         
     except Exception as e:
-        return f"<h1>Error: {str(e)}</h1>", 500
+        return f"<h1>Error: {str(e)}</h1><pre>{repr(e)}</pre>", 500
 
 
 if __name__ == "__main__":
