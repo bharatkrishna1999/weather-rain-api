@@ -271,6 +271,7 @@ def home():
         <div class="endpoint">
             <h3>Examples:</h3>
             <ul>
+                <li><a href="/rain-forecast">🎯 Auto-Detect My Location</a></li>
                 <li><a href="/rain-forecast?city=Chennai">🎨 Chennai - Beautiful Forecast</a></li>
                 <li><a href="/rain-forecast?city=Delhi">🎨 Delhi - Beautiful Forecast</a></li>
                 <li><a href="/predict-rain?city=Chennai">📊 Chennai - JSON Data</a></li>
@@ -422,13 +423,25 @@ def predict_rain():
 @app.route("/rain-forecast", methods=["GET"])
 def rain_forecast_html():
     """Beautiful HTML version of rain prediction with AQI tab"""
-    city = request.args.get("city", "London")
+    city = request.args.get("city", None)
+    lat = request.args.get("lat", None)
+    lon = request.args.get("lon", None)
+    
+    # If no city and no coordinates, show location detection page
+    if not city and not lat and not lon:
+        return render_location_page()
+    
+    # Determine query parameter for weather API
+    if lat and lon:
+        query = f"{lat},{lon}"
+    else:
+        query = city
     
     # Get prediction data
     weather_url = "http://api.weatherapi.com/v1/forecast.json"
     weather_params = {
         "key": WEATHER_API_KEY,
-        "q": city,
+        "q": query,
         "days": 3,
         "aqi": "yes"
     }
@@ -1103,7 +1116,7 @@ def rain_forecast_html():
                 
                 <div class="search-box">
                     <form action="/rain-forecast" method="get">
-                        <input type="text" name="city" placeholder="Enter city name..." class="search-input" value="{city}">
+                        <input type="text" name="city" placeholder="Enter city name..." class="search-input" value="{location['name']}">
                         <button type="submit" class="search-button">Check Weather</button>
                     </form>
                 </div>
@@ -1391,6 +1404,149 @@ def rain_forecast_html():
         
     except Exception as e:
         return f"<h1>Error: {str(e)}</h1>", 500
+
+
+
+
+def render_location_page():
+    """Render page that asks for location permission and auto-detects city"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Detecting Your Location...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            .location-container {
+                background: white;
+                border-radius: 20px;
+                padding: 50px;
+                text-align: center;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                max-width: 500px;
+            }
+            h1 { color: #2c3e50; margin-bottom: 20px; font-size: 2em; }
+            .loader {
+                border: 5px solid #f3f3f3;
+                border-top: 5px solid #667eea;
+                border-radius: 50%;
+                width: 60px;
+                height: 60px;
+                animation: spin 1s linear infinite;
+                margin: 30px auto;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .status { color: #7f8c8d; margin: 20px 0; font-size: 1.1em; }
+            .manual-search {
+                margin-top: 30px;
+                padding-top: 30px;
+                border-top: 2px solid #ecf0f1;
+            }
+            .search-input {
+                padding: 15px 25px;
+                font-size: 1.1em;
+                border: 2px solid #ecf0f1;
+                border-radius: 50px;
+                width: 100%;
+                margin-bottom: 15px;
+            }
+            .search-button {
+                padding: 15px 35px;
+                font-size: 1.1em;
+                background: #667eea;
+                color: white;
+                border: none;
+                border-radius: 50px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: all 0.3s ease;
+            }
+            .search-button:hover {
+                background: #5568d3;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+            }
+            .error { color: #e74c3c; margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="location-container">
+            <h1>🌍 Detecting Your Location</h1>
+            <div class="loader" id="loader"></div>
+            <div class="status" id="status">Getting your location...</div>
+            
+            <div class="manual-search">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">Or Search Manually</h3>
+                <form action="/rain-forecast" method="get">
+                    <input type="text" name="city" placeholder="Enter city name..." class="search-input" required>
+                    <button type="submit" class="search-button">Check Weather</button>
+                </form>
+            </div>
+        </div>
+        
+        <script>
+            // Automatically detect location on page load
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    // Success callback
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        
+                        document.getElementById('status').textContent = 'Location found! Loading your weather...';
+                        
+                        // Redirect to weather page with coordinates
+                        window.location.href = '/rain-forecast?lat=' + lat + '&lon=' + lon;
+                    },
+                    // Error callback
+                    function(error) {
+                        document.getElementById('loader').style.display = 'none';
+                        let errorMsg = '';
+                        
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMsg = "Location permission denied. Please search manually or allow location access.";
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMsg = "Location unavailable. Please search manually.";
+                                break;
+                            case error.TIMEOUT:
+                                errorMsg = "Location request timeout. Please search manually.";
+                                break;
+                            default:
+                                errorMsg = "An error occurred. Please search manually.";
+                        }
+                        
+                        document.getElementById('status').innerHTML = '<div class="error">⚠️ ' + errorMsg + '</div>';
+                    },
+                    // Options
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('status').innerHTML = '<div class="error">⚠️ Geolocation is not supported by your browser. Please search manually.</div>';
+            }
+        </script>
+    </body>
+    </html>
+    """
 
 
 @app.route("/model-info", methods=["GET"])
