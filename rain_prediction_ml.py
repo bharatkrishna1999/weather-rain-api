@@ -172,6 +172,8 @@ def home():
         <meta property="og:description" content="Smart analysis for every NSE stock. Real-time weather forecasts and air quality data powered by machine learning.">
         <meta property="og:type" content="website">
         <meta property="og:image" content="https://stock-analysis-pro-i6y6.onrender.com/static/og-image.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="627">
         <meta property="og:url" content="https://stock-analysis-pro-i6y6.onrender.com/">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="ML Weather & AQI API">
@@ -598,6 +600,8 @@ def rain_forecast_html():
             <meta property="og:description" content="Weather forecast and rain prediction for {location['name']}. Powered by machine learning.">
             <meta property="og:type" content="website">
             <meta property="og:image" content="https://stock-analysis-pro-i6y6.onrender.com/static/og-image.png">
+            <meta property="og:image:width" content="1200">
+            <meta property="og:image:height" content="627">
             <meta property="og:url" content="https://stock-analysis-pro-i6y6.onrender.com/">
             <meta name="twitter:card" content="summary_large_image">
             <meta name="twitter:title" content="Weather Forecast - {location['name']}">
