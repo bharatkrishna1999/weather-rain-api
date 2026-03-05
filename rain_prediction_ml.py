@@ -167,6 +167,18 @@ def home():
         <title>ML Weather & AQI API</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta charset="utf-8">
+        <meta name="description" content="Smart analysis for every NSE stock. Real-time weather forecasts and air quality data powered by machine learning.">
+        <meta property="og:title" content="ML Weather & AQI API">
+        <meta property="og:description" content="Smart analysis for every NSE stock. Real-time weather forecasts and air quality data powered by machine learning.">
+        <meta property="og:type" content="website">
+        <meta property="og:image" content="https://stock-analysis-pro-i6y6.onrender.com/static/og-image.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="627">
+        <meta property="og:url" content="https://stock-analysis-pro-i6y6.onrender.com/">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="ML Weather & AQI API">
+        <meta name="twitter:description" content="Smart analysis for every NSE stock. Real-time weather forecasts and air quality data powered by machine learning.">
+        <meta name="twitter:image" content="https://stock-analysis-pro-i6y6.onrender.com/static/og-image.png">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
@@ -583,6 +595,18 @@ def rain_forecast_html():
             <title>Weather Forecast - {location['name']}</title>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <meta charset="utf-8">
+            <meta name="description" content="Weather forecast and rain prediction for {location['name']}. Powered by machine learning.">
+            <meta property="og:title" content="Weather Forecast - {location['name']}">
+            <meta property="og:description" content="Weather forecast and rain prediction for {location['name']}. Powered by machine learning.">
+            <meta property="og:type" content="website">
+            <meta property="og:image" content="https://stock-analysis-pro-i6y6.onrender.com/static/og-image.png">
+            <meta property="og:image:width" content="1200">
+            <meta property="og:image:height" content="627">
+            <meta property="og:url" content="https://stock-analysis-pro-i6y6.onrender.com/">
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="Weather Forecast - {location['name']}">
+            <meta name="twitter:description" content="Weather forecast and rain prediction for {location['name']}. Powered by machine learning.">
+            <meta name="twitter:image" content="https://stock-analysis-pro-i6y6.onrender.com/static/og-image.png">
             <link rel="preconnect" href="https://fonts.googleapis.com">
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
             <style>
